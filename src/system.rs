@@ -1,44 +1,57 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, ops::AddAssign};
+use num::traits::{Zero, One};
 
-/// This is the System Pallet.
-/// It handles low level state needed for your blockchain.
-
-#[derive(Debug)]
-pub struct Pallet {
-	/// The current block number.
-	block_number: u32,
-
-	/// A map from an account to their nonce.
-	nonce: BTreeMap<String, u32>,
+pub trait Config {
+    type AccountId: Ord + Clone;
+    type BlockNumber: Zero + Copy + AddAssign + One;
+    type Nonce: AddAssign + Default + One;
 }
 
-impl Pallet {
+#[derive(Debug)]
+pub struct Pallet<T: Config> {
+	/// The current block number.
+	block_number: T::BlockNumber,
+
+	/// A map from an account to their nonce.
+	nonce: BTreeMap<T::AccountId, T::Nonce>,
+}
+
+impl <T: Config> Pallet<T>{
 	/// Create a new instance of the System Pallet.
 	pub fn new() -> Self {
-		Self { block_number: 0, nonce: BTreeMap::new() }
+		Self { block_number: T::BlockNumber::zero(), nonce: BTreeMap::new() }
 	}
 
-	pub fn block_number(&self) -> u32 {
+	pub fn block_number(&self) -> T::BlockNumber {
 		self.block_number
 	}
 
 	pub fn inc_block_number(&mut self) {
-		self.block_number += 1
+		self.block_number += T::BlockNumber::one();
 	}
 
-	pub fn inc_nonce(&mut self, who: &String) {
-		*self.nonce.entry(who.clone()).or_default() += 1;
+	pub fn inc_nonce(&mut self, who: &T::AccountId) {
+		*self.nonce.entry(who.clone()).or_default() += T::Nonce::one();
 	}
 }
 
 #[cfg(test)]
 mod test {
+    use super::*;
+    struct TestConfig;
+
+    impl Config for TestConfig {
+        type AccountId = String;
+        type BlockNumber = u16;
+        type Nonce = u8;
+    }
+
 	#[test]
 	fn init_system() {
-		let mut system = super::Pallet::new();
+		let mut system: Pallet<TestConfig> = Pallet::new();
 
 		system.inc_block_number();
-		();
+
 		system.inc_nonce(&"alice".to_string());
 
 		assert_eq!(system.block_number(), 1);
