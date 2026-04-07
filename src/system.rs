@@ -1,10 +1,10 @@
+use num::traits::{One, Zero};
 use std::{collections::BTreeMap, ops::AddAssign};
-use num::traits::{Zero, One};
 
 pub trait Config {
-    type AccountId: Ord + Clone;
-    type BlockNumber: Zero + Copy + AddAssign + One;
-    type Nonce: AddAssign + Default + One;
+	type AccountId: Ord + Clone;
+	type BlockNumber: Zero + Copy + AddAssign + One;
+	type Nonce: AddAssign + Default + One;
 }
 
 #[derive(Debug)]
@@ -16,7 +16,7 @@ pub struct Pallet<T: Config> {
 	nonce: BTreeMap<T::AccountId, T::Nonce>,
 }
 
-impl <T: Config> Pallet<T>{
+impl<T: Config> Pallet<T> {
 	/// Create a new instance of the System Pallet.
 	pub fn new() -> Self {
 		Self { block_number: T::BlockNumber::zero(), nonce: BTreeMap::new() }
@@ -37,14 +37,14 @@ impl <T: Config> Pallet<T>{
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    struct TestConfig;
+	use super::*;
+	struct TestConfig;
 
-    impl Config for TestConfig {
-        type AccountId = String;
-        type BlockNumber = u16;
-        type Nonce = u8;
-    }
+	impl Config for TestConfig {
+		type AccountId = String;
+		type BlockNumber = u16;
+		type Nonce = u8;
+	}
 
 	#[test]
 	fn init_system() {
