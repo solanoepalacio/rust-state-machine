@@ -1,4 +1,5 @@
 mod balances;
+mod proof_of_existence;
 mod support;
 mod system;
 
@@ -15,12 +16,14 @@ mod types {
 	pub type Extrinsic = crate::support::Extrinsic<AccountId, crate::RuntimeCall>;
 	pub type Header = crate::support::Header<BlockNumber>;
 	pub type Block = crate::support::Block<Header, Extrinsic>;
+	pub type Content = String;
 }
 
 // These are all the calls which are exposed to the world.
 // Note that it is just an accumulation of the calls exposed by each module.
 pub enum RuntimeCall {
 	Balances(balances::Call<Runtime>),
+	PoE(proof_of_existence::Call<Runtime>),
 }
 
 // This is our main Runtime.
@@ -29,6 +32,7 @@ pub enum RuntimeCall {
 pub struct Runtime {
 	system: system::Pallet<Self>,
 	balances: balances::Pallet<Self>,
+	proof_of_existence: proof_of_existence::Pallet<Self>,
 }
 
 impl system::Config for Runtime {
@@ -41,10 +45,18 @@ impl balances::Config for Runtime {
 	type Balance = types::Balance;
 }
 
+impl proof_of_existence::Config for Runtime {
+	type Content = types::Content;
+}
+
 impl Runtime {
 	// Create a new instance of the main Runtime, by creating a new instance of each pallet.
 	fn new() -> Self {
-		Self { system: system::Pallet::new(), balances: balances::Pallet::new() }
+		Self {
+			system: system::Pallet::new(),
+			balances: balances::Pallet::new(),
+			proof_of_existence: proof_of_existence::Pallet::new(),
+		}
 	}
 
 	// Execute a block of extrinsics. Increments the block number.
@@ -84,9 +96,8 @@ impl crate::support::Dispatch for Runtime {
 		// This match statement will allow us to correctly route `RuntimeCall`s
 		// to the appropriate pallet level function.
 		match runtime_call {
-			RuntimeCall::Balances(call) => {
-				self.balances.dispatch(caller, call)
-			}
+			RuntimeCall::Balances(call) => self.balances.dispatch(caller, call),
+			RuntimeCall::PoE(call) => self.proof_of_existence.dispatch(caller, call),
 		}
 	}
 }
@@ -109,10 +120,13 @@ fn main() {
 		extrinsics: vec![
 			support::Extrinsic {
 				caller: alice.clone(),
-				call: RuntimeCall::Balances(balances::Call::Transfer { to: bob, amount: 30 }),
+				call: RuntimeCall::Balances(balances::Call::Transfer {
+					to: bob.clone(),
+					amount: 30,
+				}),
 			},
 			support::Extrinsic {
-				caller: alice,
+				caller: alice.clone(),
 				call: RuntimeCall::Balances(balances::Call::Transfer { to: charlie, amount: 20 }),
 			},
 		],
@@ -122,6 +136,55 @@ fn main() {
 	// If there are any errors, our system panics, since we should not execute invalid blocks.
 	runtime.execute_block(block_1).expect("invalid block");
 
-	// Simply print the debug format of our runtime state.
-	println!("{runtime:#?}");
+	println!("Runtime after first block: {runtime:#?}");
+
+	let block_2 = types::Block {
+		header: support::Header { block_number: 2 },
+		extrinsics: vec![
+			support::Extrinsic {
+				caller: alice.clone(),
+				call: RuntimeCall::PoE(proof_of_existence::Call::CreateClaim {
+					claim: String::from("Hello, this is the first claim ever."),
+				}),
+			},
+			support::Extrinsic {
+				caller: bob.clone(),
+				call: RuntimeCall::PoE(proof_of_existence::Call::CreateClaim {
+					claim: String::from("Hello, this is MY first claim. Bob."),
+				}),
+			},
+			support::Extrinsic {
+				caller: bob.clone(),
+				call: RuntimeCall::PoE(proof_of_existence::Call::CreateClaim {
+					claim: String::from("Hello, this is the first claim ever."),
+				}),
+			},
+		],
+	};
+
+	runtime.execute_block(block_2).expect("invalid block");
+
+	println!("Runtime after second block: {runtime:#?}");
+
+	let block_3 = types::Block {
+		header: support::Header { block_number: 3 },
+		extrinsics: vec![
+			support::Extrinsic {
+				caller: alice.clone(),
+				call: RuntimeCall::PoE(proof_of_existence::Call::RevokeClaim {
+					claim: String::from("Hello, this is the first claim ever."),
+				}),
+			},
+			support::Extrinsic {
+				caller: bob.clone(),
+				call: RuntimeCall::PoE(proof_of_existence::Call::CreateClaim {
+					claim: String::from("Hello, this is the first claim ever."),
+				}),
+			},
+		],
+	};
+
+	runtime.execute_block(block_3);
+
+	println!("Runtime after third block: {runtime:#?}");
 }
